@@ -6,11 +6,12 @@ import SimpleMDE from 'react-simplemde-editor';
 import { selectIsAuth } from '../../redux/slices/auth';
 import 'easymde/dist/easymde.min.css';
 import styles from './AddPost.module.scss';
-import { useNavigate ,Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from '../../axios';
 
 export const AddPost = () => {
+  const {id} = useParams();
   const navigate = useNavigate();
   const isAuth = useSelector(selectIsAuth);
   const [text, setText] = React.useState('');
@@ -20,12 +21,16 @@ export const AddPost = () => {
   const [imageUrl, setImageUrl] = React.useState('');
   const inputFileRef = React.useRef(null);
 
+  const isEditing = Boolean(id)
+
   const handleChangeFile = async (event) => {
     try {
       const formData = new FormData();
       const file = event.target.files[0];
       formData.append('image', file);
+      
       const  { data } = await axios.post('/upload', formData);
+
       setImageUrl(data.url);
     } catch (err) {
       console.warn(err);
@@ -52,16 +57,35 @@ export const AddPost = () => {
         text
       }
 
-      const { data } = await axios.post('/posts', fields);
-      const id = data._id;
+      const { data } = isEditing 
+      ? await axios.patch(`/posts/${id}`, fields)
+      : await axios.post('/posts', fields)
 
-      navigate(`/posts/${id}`);
+
+      const _id = isEditing ? id : data._id;
+
+      navigate(`/posts/${_id}`);
 
     } catch (err) {
       console.warn(err);
       alert('Failed to publish ')
     }
   }
+
+  React.useEffect(() => {
+    if (id) {
+      axios.get(`/posts/${id}`).then(({data}) =>{
+        setTitle(data.title);
+        setText(data.text);
+        setImageUrl(data.imageUrl);
+        setTags(data.tags.join(','));
+      }).catch(err => {
+        console.warn(err);
+        alert('Failed to get article')
+      })
+    }
+  }, [])
+
   const options = React.useMemo(
     () => ({
       spellChecker: false,
@@ -118,7 +142,7 @@ export const AddPost = () => {
       <SimpleMDE className={styles.editor} value={text} onChange={onChange} options={options} />
       <div className={styles.buttons}>
         <Button onClick={onSubmit} size="large" variant="contained">
-          Publish
+          {isEditing ? "Save" : "Publish"}
         </Button>
         <a href="/">
           <Button size="large">Cancel</Button>
